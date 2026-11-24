@@ -1,0 +1,1440 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>考前一卷 · 组卷器</title>
+<style>
+:root{
+  --ink:#18212b; --muted:#5b6a72; --line:#c9d3cd; --accent:#1f5c4d;
+  --sans:"Microsoft YaHei","PingFang SC","Hiragino Sans GB",system-ui,sans-serif;
+  --song:"Songti SC","STSong","SimSun","Noto Serif CJK SC",serif;
+  --math:"Cambria Math","STIX Two Math","Latin Modern Math",var(--song);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{font-family:var(--sans);color:var(--ink);background:#e6ebe8}
+.app{display:grid;grid-template-columns:minmax(0,1fr) 306px;grid-template-areas:"bar bar" "stage panel";min-height:100vh}
+
+/* ---------- 工具条 ---------- */
+.bar{grid-area:bar;position:sticky;top:0;z-index:30;display:flex;gap:14px;align-items:center;padding:10px 18px;background:#12312b;color:#fff;flex-wrap:wrap}
+.brand b{font-size:16px;letter-spacing:.08em}
+.brand span{font-size:12px;color:#a8c4bb;margin-left:8px}
+.seg{display:flex;border:1px solid #3c5f56;border-radius:8px;overflow:hidden}
+.seg button{background:transparent;color:#cfe3dc;border:0;padding:7px 15px;font:inherit;font-size:13px;cursor:pointer}
+.seg button.on{background:#2e7d68;color:#fff}
+.acts{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.acts button{font:inherit;font-size:13px;padding:7px 14px;border-radius:8px;border:1px solid #4a6c63;background:#1b433b;color:#e8f2ee;cursor:pointer}
+.acts button:hover{background:#25534a}
+.acts .primary{background:#f0c468;color:#3a2a05;border-color:#f0c468;font-weight:700}
+.acts .primary:hover{background:#f7d489}
+.ready-paper #btnOpen,.ready-paper #btnPaste,.ready-paper #btnDemo{display:none}
+.acts button:disabled{opacity:.45;cursor:not-allowed}
+
+/* ---------- 右侧面板 ---------- */
+.panel{grid-area:panel;padding:16px 16px 40px;background:#f7faf8;border-left:1px solid #d6e0da;font-size:13px;line-height:1.65;overflow:auto;max-height:calc(100vh - 54px);position:sticky;top:54px}
+.panel h2{font-size:12px;letter-spacing:.12em;color:#476b60;margin:18px 0 8px;font-weight:700}
+.panel h2:first-child{margin-top:0}
+.pmeta{background:#fff;border:1px solid #dde6e1;border-radius:8px;padding:10px 12px}
+.pmeta b{display:block;font-size:14px;margin-bottom:2px}
+.pmeta em{font-style:normal;color:var(--muted)}
+.diag{list-style:none;margin:0;padding:0}
+.diag li{display:flex;gap:8px;padding:6px 9px;border-radius:6px;margin-bottom:5px;font-size:12.5px;line-height:1.55}
+.diag li.e{background:#fdeceb;border-left:3px solid #c0392b;color:#7d2119}
+.diag li.w{background:#fdf6e3;border-left:3px solid #d5a021;color:#6b4c05}
+.diag li.ok{background:#e9f5ee;border-left:3px solid #2e7d68;color:#1f4f40}
+.diag li:before{content:"●";font-size:9px;line-height:1.9;flex:none}
+.home-open .app{display:block}
+.home-open .seg,.home-open .panel,.home-open .sheet,.home-open #hintbar,.home-open #btnOpen,.home-open #btnPaste,.home-open #btnPrint{display:none}
+.home-open .stage{padding:clamp(18px,4vw,50px) 14px 40px}
+.home{max-width:750px;margin:auto;color:var(--ink)}
+.home h1{font-size:clamp(25px,4vw,37px);line-height:1.25;margin:0 0 24px}
+.home h2{font-size:19px;margin:0 0 9px}
+.home p{margin:0;line-height:1.7}
+.home section{margin:14px 0;padding:clamp(16px,3vw,25px);background:#fff;border:1px solid var(--line);border-radius:12px}
+.home .installed{background:#f1f7f3;border-left:4px solid var(--accent)}
+.home blockquote{margin:12px 0 0;padding:9px 14px;border-left:2px solid #78a58c;background:#fff;line-height:1.65}
+.home ol{margin:14px 0 0;padding-left:1.7em}
+.home li{padding:2px 0 10px 3px;line-height:1.6}
+.home li:last-child{padding-bottom:0}
+.home li::marker{color:var(--accent);font-weight:bold}
+.home .tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.difficulty{display:block;margin:7px 0}
+.difficulty select,.revision input,.revision select{padding:5px;border:1px solid #acbcb1;border-radius:4px;font:inherit;max-width:100%}
+.revision{margin:12px 0}
+.revision summary{cursor:pointer;font-weight:bold}
+.revision button{margin:4px 2px 0 0}
+.home button,.copy-dialog button{cursor:pointer;font:inherit;font-size:14px;border:1px solid #b2c4b9;border-radius:6px;background:#fff;color:#184738;padding:7px 12px}
+.home .primary,.copy-dialog button{background:var(--accent);color:#fff;border-color:var(--accent)}
+.copy-dialog{width:min(580px,92vw);border:1px solid var(--line);border-radius:10px;padding:20px}
+.copy-dialog::backdrop{background:#102620a6}
+.copy-dialog h2{font-size:18px;margin:0}
+.copy-dialog textarea{display:block;width:100%;height:min(32vh,230px);margin:10px 0;font:14px/1.5 monospace}
+.tip{color:var(--muted);font-size:12px;margin:10px 0 0}
+code{background:#e7eeea;padding:1px 5px;border-radius:4px;font-size:12px}
+
+/* ---------- 纸张 ---------- */
+.stage{padding:22px 22px 60px;overflow:auto}
+.hintbar{max-width:210mm;margin:0 auto 10px;font-size:12.5px;color:#3d5a52;background:#eef6f1;border:1px solid #cfe0d6;border-radius:8px;padding:8px 12px}
+.sheet{width:210mm;min-height:297mm;margin:0 auto 26px;padding:15mm 14mm 16mm;background:#fff;box-shadow:0 2px 18px rgba(16,40,32,.16);font-family:var(--song);color:#111;font-size:12pt;line-height:1.9}
+
+/* 卷头 */
+.imprint{display:flex;justify-content:space-between;font-family:var(--sans);font-size:9pt;color:#333;letter-spacing:.1em;border-bottom:1.2px solid #222;padding-bottom:1.6mm}
+.sheet h1{font-size:19pt;margin:6mm 0 2mm;text-align:center;font-weight:700;letter-spacing:.02em;line-height:1.35}
+.course{text-align:center;margin:0 0 1mm;font-size:10.5pt;color:#333}
+.meta{text-align:center;font-size:9.5pt;color:#444;margin-bottom:4mm;font-family:var(--sans)}
+.cover{display:flex;flex-wrap:wrap;gap:4mm 8mm;font-size:10.5pt;border-top:1px solid #bbb;border-bottom:1px solid #bbb;padding:2.2mm 0;margin:0 0 5mm}
+.cover span{white-space:nowrap}
+.cover i{display:inline-block;min-width:24mm;border-bottom:1px solid #444;font-style:normal}
+
+/* 题目 */
+.group h2{font-size:12pt;margin:5mm 0 2mm;font-weight:700;letter-spacing:.02em}
+.group h2 small{font-weight:400;font-size:9pt;color:#555;margin-left:2mm;font-family:var(--sans)}
+.q{page-break-inside:avoid;break-inside:avoid;margin:0 0 2mm;padding-top:1mm}
+.qh{display:flex;justify-content:space-between;gap:3mm;align-items:baseline;font-size:11pt}
+.qh b{font-weight:700}
+.qh .pts{font-size:9pt;color:#555;white-space:nowrap;font-family:var(--sans)}
+.ask{white-space:pre-line;margin:1mm 0 1.5mm;text-align:justify}
+.opts{list-style:none;margin:0 0 1mm;padding-left:7mm}
+.opts li{margin:.6mm 0;text-align:justify}
+.space{display:block}
+.space.tight{border-bottom:1px dotted #ccc}
+.opts.short{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1mm 3mm}
+.opts.medium{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1mm 3mm}
+.panel fieldset{border:0;margin:12px 0;padding:0}
+.panel label{display:block;margin:5px 0}
+.panel select{max-width:100%}
+.panel button{cursor:pointer}
+@media screen and (max-width:800px){
+  .app{display:flex;flex-direction:column}
+  .bar{position:static;padding:10px;gap:8px}
+  .acts{margin:0}
+  .stage{padding:8px;overflow:visible}
+  .sheet{width:100%;min-height:0;padding:16px 14px;margin:0;overflow-wrap:anywhere;line-height:1.65}
+  .panel{position:static;max-height:none;border-left:0}
+  .opts.short{grid-template-columns:repeat(2,minmax(0,1fr))}
+  table.mat{table-layout:fixed}
+  .opts.medium{display:block}
+}
+
+/* 公式 */
+.tex{font-family:var(--math);font-style:normal;white-space:normal}
+.tex i{font-style:italic;padding:0 .02em}
+.frac{display:inline-flex;flex-direction:column;vertical-align:-.55em;text-align:center;margin:0 .14em;font-size:.95em;line-height:1.22;white-space:nowrap}
+.frac .fn{border-bottom:1px solid currentColor;padding:0 .22em}
+.frac .fd{padding:0 .22em}
+.sqrt{white-space:nowrap}
+.sqrt:before{content:"√";margin-right:-.04em}
+.sqrt .rad{border-top:1px solid currentColor;padding:0 .12em .04em}
+.tex-block{display:block;text-align:center;margin:2mm 0;font-family:var(--math)}
+.tex-bad{color:#b3261e;font-family:ui-monospace,Consolas,monospace;font-size:.92em}
+sup,sub{font-size:.7em;line-height:0}
+.fn-name{font-style:normal;margin-right:.1em}
+
+/* 教师版 */
+.answers{margin-top:9mm}
+.answers>h2{font-family:var(--sans);font-size:13pt;color:var(--accent);border-bottom:1.6px solid var(--accent);padding-bottom:1.2mm;margin:7mm 0 3mm}
+.key{padding:2mm 0 2.5mm;border-bottom:1px solid #e2e2e2;break-inside:avoid;page-break-inside:avoid}
+.key h3{font-size:11pt;margin:0 0 1mm;color:var(--accent)}
+.key h3 small{font-weight:400;font-size:9pt;color:#666;margin-left:2mm;font-family:var(--sans)}
+.key p{margin:.8mm 0 1.5mm;text-align:justify}
+.key h4{font-size:9.5pt;margin:2mm 0 .6mm;color:#333;font-family:var(--sans);letter-spacing:.06em}
+.key ul{margin:0;padding-left:6mm}
+.key li{margin:.5mm 0;text-align:justify}
+.key .src{font-size:9pt;color:#444}
+.key .quote{color:#444}
+table.mat{width:100%;border-collapse:collapse;font-size:9pt;font-family:var(--sans);margin:2mm 0 4mm}
+table.mat th,table.mat td{border:1px solid #999;padding:1.3mm 1.6mm;text-align:left;vertical-align:top;line-height:1.55}
+table.mat th{background:#eef2ef;font-weight:700}
+table.mat td.c,table.mat th.c{text-align:center}
+
+/* 状态与浮层 */
+.empty{max-width:120mm;margin:28mm auto;text-align:center;color:#5b6a72;font-family:var(--sans);font-size:13px;line-height:2}
+.empty b{display:block;font-size:16px;color:#12312b;margin-bottom:6px}
+.errbar{max-width:210mm;margin:0 auto 10px;background:#fdeceb;border:1px solid #e8b4ae;color:#7d2119;border-radius:8px;padding:8px 12px;font-size:12.5px}
+.overlay{position:fixed;inset:0;background:rgba(12,26,22,.55);display:none;align-items:center;justify-content:center;z-index:60;padding:24px}
+.overlay.on{display:flex}
+.modal{width:min(720px,100%);background:#fff;border-radius:12px;padding:18px 20px 16px;box-shadow:0 18px 50px rgba(0,0,0,.3)}
+.modal h3{margin:0 0 6px;font-size:15px}
+.modal p{margin:0 0 10px;font-size:12.5px;color:var(--muted);line-height:1.6}
+.modal textarea{width:100%;height:260px;font-family:ui-monospace,Consolas,monospace;font-size:12px;line-height:1.5;border:1px solid #cdd8d2;border-radius:8px;padding:10px;resize:vertical}
+.modal .row{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+.modal button{font:inherit;font-size:13px;padding:8px 16px;border-radius:8px;border:1px solid #cdd8d2;background:#f3f7f4;cursor:pointer}
+.modal button.primary{background:#1f5c4d;color:#fff;border-color:#1f5c4d;font-weight:600}
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);background:#12312b;color:#eaf4f0;padding:10px 18px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:.22s;z-index:80;max-width:80vw}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.drag .stage{outline:3px dashed #2e7d68;outline-offset:-12px}
+
+/* ---------- 打印 ---------- */
+@page{size:A4;margin:15mm 14mm 16mm}
+@media print{
+  .tex.short-formula{display:inline-block;white-space:nowrap}
+  body{background:#fff}
+  .app{display:block;min-height:0}
+  .bar,.panel,.hintbar,.errbar,.overlay,.toast,.empty,.home,.copy-dialog{display:none!important}
+  .stage{padding:0;overflow:visible}
+  .sheet{width:auto;min-height:0;margin:0;padding:0;box-shadow:none;font-size:11pt;line-height:1.85}
+  .sheet h1{font-size:17pt;margin:4mm 0 1mm}
+  .group h2{margin:4mm 0 1.5mm;break-after:avoid}
+  .group-start{break-inside:avoid;page-break-inside:avoid}
+  .answers{break-before:page;page-break-before:always}
+  body.answer-only .answers{break-before:auto;page-break-before:auto;margin:0}
+  body.print-blocked .sheet{display:none}
+  body.print-blocked::before{content:"试卷尚未就绪。请返回组卷器，检查批次和体检结果。"}
+  a{color:inherit;text-decoration:none}
+}
+</style>
+</head>
+<body class="mode-student">
+
+<div class="app">
+  <header class="bar">
+    <div class="brand"><b>考前一卷</b><span>章节模拟卷 · 组卷器</span></div>
+    <div class="seg" role="group" aria-label="版本">
+      <button type="button" class="on" data-mode="student">学生版</button>
+      <button type="button" data-mode="teacher">教师版</button>
+    </div>
+    <div class="acts">
+      <button type="button" id="btnHome" hidden>出卷首页</button>
+      <button type="button" id="btnResume" hidden>回到当前试卷</button>
+      <button type="button" id="btnOpen">打开题库</button>
+      <button type="button" id="btnPaste">粘贴</button>
+      <button type="button" id="btnDemo">看示例</button>
+      <button type="button" id="btnPrint" class="primary">打印 / 存 PDF</button>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="home" id="home" hidden>
+      <h1>把一章教材变成一份模拟卷</h1>
+      <section class="installed">
+        <h2>已装技能 · 直接出卷</h2>
+        <p>在豆包工作或 DSH 附上这一章的教材、课件或笔记，告诉它：</p>
+        <blockquote>用考前一卷给这一章出一份 20 分的模拟卷，难一点，多考综合应用。答案单独看。</blockquote>
+      </section>
+      <section>
+        <h2>普通聊天 · 三步出卷</h2>
+        <ol>
+          <li><strong>复制提示词，和教材一起发给 AI。</strong>
+            <label class="difficulty">本次难度 <select id="difficulty"><option>基础巩固</option><option selected>标准模拟</option><option>提高挑战</option></select></label>
+            <p class="tip" id="difficultyHint" aria-live="polite"></p>
+            <div class="tools"><button type="button" class="primary" data-prompt="doubao">复制豆包提示词</button><button type="button" data-prompt="generic">复制通用提示词</button></div>
+          </li>
+          <li><strong>把 AI 返回的题库导入这里。</strong><p>收到一段 JSON 就粘贴，收到文件就打开。分批给的题库从第 1 批开始导入。</p>
+            <div class="tools"><button type="button" id="homePaste">粘贴题库</button><button type="button" id="homeOpen">打开 JSON 文件</button></div>
+          </li>
+          <li><strong>选学生版，打印或存为 PDF。</strong><p>做完切到教师版，按评分点对答案。</p></li>
+        </ol>
+      </section>
+    </div>
+    <div class="hintbar" id="hintbar" hidden></div>
+    <div class="sheet" id="sheet"></div>
+  </main>
+
+  <aside class="panel">
+    <fieldset id="teacherTools" hidden>
+      <legend>教师版打印内容</legend>
+      <label><input type="checkbox" id="onlyAnswers" checked> 仅打印答案与评分点</label>
+      <label><input type="checkbox" id="withMatrix"> 附考点细目表</label>
+      <label><input type="checkbox" id="withCites"> 附引文核对表</label>
+    </fieldset>
+    <h2>当前卷子</h2>
+    <div class="pmeta" id="pmeta">还没有载入题库。</div>
+    <details class="revision" id="revision" hidden>
+      <summary>只换几道题</summary>
+      <p>填入卷面题号，把换题要求发回原对话，再把回答粘回来。</p>
+      <label>题号 <input id="revisionNumbers" placeholder="例如 5-6 或 2、5" size="15"></label>
+      <label>换成 <select id="revisionLevel"><option>基础巩固</option><option>标准模拟</option><option selected>提高挑战</option></select></label>
+      <button type="button" id="copyRevision">复制换题要求</button>
+      <button type="button" id="pasteRevision">粘贴换题结果</button>
+      <p class="tip" id="revisionStatus" role="status"></p>
+    </details>
+    <h2>体检</h2>
+    <ul class="diag" id="diag"></ul>
+    <fieldset id="sourceTools" hidden>
+      <legend>用原件核对引文</legend>
+      <label>材料 <select id="sourceKey"></select></label>
+      <button type="button" id="checkSource">选择对应的 TXT / Markdown 原件</button>
+      <input type="file" id="sourceFile" accept=".txt,.md,text/plain" hidden>
+      <p class="tip">逐行比对原句。PDF 可由生成工具逐页核对，也可对照原件人工复核。</p>
+    </fieldset>
+    <h2>打印设置</h2>
+    <p class="tip">打印对话框里：纸张 <b>A4</b>、边距 <b>默认</b>、缩放 <b>100%</b>；想要页码就勾选「页眉和页脚」。目标打印机可以选「另存为 PDF」。</p>
+  </aside>
+</div>
+
+<input type="file" id="file" accept=".json,application/json" hidden>
+
+<div class="overlay" id="ovPaste">
+  <div class="modal">
+    <h3 id="pasteTitle">粘贴题库 JSON</h3>
+    <p id="pasteHelp">粘贴 AI 输出的整段题库。分批时从第 1 批开始，按顺序载入。</p>
+    <textarea id="ta" placeholder='{"schema":"kaoqian/v2", "meta":{...}, "questions":[...]}'></textarea>
+    <div class="row">
+      <button type="button" id="btnCancel">取消</button>
+      <button type="button" id="btnOk" class="primary">载入</button>
+    </div>
+  </div>
+</div>
+
+<dialog class="copy-dialog" id="manualCopy" aria-labelledby="manualTitle">
+  <h2 id="manualTitle">手动复制提示词</h2>
+  <p>文字已选中。电脑按 Ctrl+C（Mac 按 ⌘C），手机长按后选“复制”。</p>
+  <textarea id="manualText" aria-label="待复制的提示词" readonly></textarea>
+  <form method="dialog"><button>完成</button></form>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script type="application/json" id="chat-prompts"></script>
+<script type="application/json" id="paper-data"></script>
+<script type="application/json" id="demo">
+{
+  "schema": "kaoqian/v2",
+  "meta": {
+    "title": "第 3 章 条件概率与事件的独立性",
+    "course": "概率论与数理统计 · 期中练习",
+    "minutes": 20,
+    "total": 20,
+    "cover": [
+      "姓名",
+      "学号",
+      "班级"
+    ]
+  },
+  "sources": {
+    "b": {
+      "kind": "book",
+      "title": "概率论与数理统计（第 3 章笔记）",
+      "file": "示例-概率论-教材片段.txt"
+    }
+  },
+  "blueprint": [
+    {
+      "type": "选择题",
+      "count": 4,
+      "points": 2,
+      "level": "理解"
+    },
+    {
+      "type": "计算题",
+      "count": 2,
+      "points": 6,
+      "level": "应用"
+    }
+  ],
+  "topics": [
+    {
+      "id": "cond",
+      "name": "条件概率的分母",
+      "level": "应用",
+      "skill": "看到“已知……”，先把条件事件确定为分母，再从缩小后的样本空间数结果。",
+      "ref": {
+        "source": "b",
+        "line": 3,
+        "quote": "定义 P(A|B) = P(AB)/P(B)，其中 P(B) > 0。"
+      }
+    },
+    {
+      "id": "mult",
+      "name": "乘法公式",
+      "level": "理解",
+      "skill": "由 P(A) 与 P(B|A) 求 P(AB)，用 P(AB) = P(A)P(B|A)。",
+      "ref": {
+        "source": "b",
+        "line": 4,
+        "quote": "P(AB) = P(A|B)P(B)"
+      }
+    },
+    {
+      "id": "total",
+      "name": "全概率公式按划分求和",
+      "level": "应用",
+      "skill": "把结果事件按来源（车间、批次、类别）拆成互斥的几支，各支概率相加。",
+      "ref": {
+        "source": "b",
+        "line": 5,
+        "quote": "若 B1, B2, …, Bn 构成样本空间的一个划分，且 P(Bi) > 0，则 P(A) = Σ P(A|Bi)P(Bi)。"
+      }
+    },
+    {
+      "id": "bayes",
+      "name": "贝叶斯公式还原来源",
+      "level": "应用",
+      "skill": "已知结果反推来历时，分母用全概率（结果发生的总概率），分子只用目标那一支。",
+      "ref": {
+        "source": "b",
+        "line": 6,
+        "quote": "P(Bi|A) = P(A|Bi)P(Bi) / Σ P(A|Bj)P(Bj)，其中分母就是 P(A)。"
+      }
+    },
+    {
+      "id": "indep",
+      "name": "互斥与独立不是一回事",
+      "level": "理解",
+      "skill": "看到互斥就用 P(AB)=0，看到独立才用 P(AB)=P(A)P(B)，两者不能互换。",
+      "ref": {
+        "source": "b",
+        "line": 8,
+        "quote": "P(A) > 0 且 P(B) > 0 时，互斥的两个事件一定不独立。"
+      }
+    }
+  ],
+  "questions": [
+    {
+      "id": "q1",
+      "type": "选择题",
+      "ask": "设 $P(A)=0.5$，$P(B)=0.4$，$P(AB)=0.2$，则 $P(A|B)=$（　　）",
+      "options": [
+        "A. 0.2",
+        "B. 0.4",
+        "C. 0.5",
+        "D. 0.8"
+      ],
+      "key": "C",
+      "topics": [
+        "cond"
+      ],
+      "points": 2,
+      "answer": "C。$P(A|B)=\\frac{P(AB)}{P(B)}=\\frac{0.2}{0.4}=0.5$，条件 $B$ 作分母。",
+      "rubric": [
+        {
+          "points": 2,
+          "for": "选 C。"
+        }
+      ],
+      "trap": "A 的 0.2 是联合概率。若把分母写成 P(A)，则 0.2 ÷ 0.5 = 0.4，对应 B。"
+    },
+    {
+      "id": "q2",
+      "type": "选择题",
+      "ask": "设 $0\u003cP(A)\u003c1$，$0\u003cP(B)\u003c1$，且 $A$ 与 $B$ 互斥，则（　　）",
+      "options": [
+        "A. A 与 B 一定相互独立",
+        "B. A 与 B 一定不相互独立",
+        "C. 无法判断是否独立",
+        "D. 当 P(A)+P(B)=1 时独立"
+      ],
+      "key": "B",
+      "topics": [
+        "indep"
+      ],
+      "points": 2,
+      "answer": "B。互斥给出 $P(AB)=0$，而 $P(A)P(B)>0$，故 $P(AB)\\ne P(A)P(B)$，一定不独立。",
+      "rubric": [
+        {
+          "points": 2,
+          "for": "选 B。"
+        }
+      ],
+      "trap": "把“互斥”和“独立”当成同一件事，误选 A。"
+    },
+    {
+      "id": "q3",
+      "type": "选择题",
+      "ask": "设 $P(A)=0.6$，$P(B|A)=0.5$，则 $P(AB)=$（　　）",
+      "options": [
+        "A. 0.3",
+        "B. 0.5",
+        "C. 0.6",
+        "D. 1.1"
+      ],
+      "key": "A",
+      "topics": [
+        "mult"
+      ],
+      "points": 2,
+      "answer": "A。由乘法公式 $P(AB)=P(A)P(B|A)=0.6\\times0.5=0.3$。",
+      "rubric": [
+        {
+          "points": 2,
+          "for": "选 A。"
+        }
+      ],
+      "trap": "把 0.6 与 0.5 相加得 1.1（选 D），概率不可能大于 1。"
+    },
+    {
+      "id": "q4",
+      "type": "选择题",
+      "ask": "某厂 70% 的产品来自甲生产线、30% 来自乙生产线，两条线次品率分别为 1% 和 4%。从全厂任取一件产品，它是次品的概率为（　　）",
+      "options": [
+        "A. 1.9%",
+        "B. 2.5%",
+        "C. 2.8%",
+        "D. 5%"
+      ],
+      "key": "A",
+      "topics": [
+        "total"
+      ],
+      "points": 2,
+      "answer": "A。$0.7\\times0.01+0.3\\times0.04=0.007+0.012=0.019$，即 1.9%。",
+      "rubric": [
+        {
+          "points": 2,
+          "for": "选 A。"
+        }
+      ],
+      "trap": "把两个次品率简单平均得 2.5%（选 B），丢掉产量占比这个权重。"
+    },
+    {
+      "id": "q5",
+      "type": "计算题",
+      "ask": "承第 4 题的数据（甲线 70%、次品率 1%；乙线 30%、次品率 4%）。若已知抽到的是一件次品，求它来自乙生产线的概率（结果保留三位小数，并写出所用公式）。",
+      "options": [],
+      "topics": [
+        "bayes",
+        "total"
+      ],
+      "points": 6,
+      "answer": "由贝叶斯公式：$P(乙|次)=\\frac{P(次|乙)P(乙)}{P(次)}=\\frac{0.3\\times0.04}{0.019}=\\frac{0.012}{0.019}\\approx0.632$，即 63.2%。",
+      "rubric": [
+        {
+          "points": 2,
+          "for": "分母取全概率 $P(次)=0.019$。"
+        },
+        {
+          "points": 2,
+          "for": "分子取乙线这一支 $0.3\\times0.04=0.012$。"
+        },
+        {
+          "points": 2,
+          "for": "结果 $0.632$（写成 63.2% 或 12/19 同样得分）。"
+        }
+      ],
+      "trap": "直接写 4% 会把“来自乙线时是次品”当成“已知是次品时来自乙线”。也可以检查结果是否在 0 到 1 之间。"
+    },
+    {
+      "id": "q6",
+      "type": "计算题",
+      "ask": "一批零件共 10 件，其中 3 件是次品。不放回地依次抽取 2 件。已知第一件取到的是正品，求第二件也是正品的概率。",
+      "options": [],
+      "topics": [
+        "cond"
+      ],
+      "points": 6,
+      "answer": "第一件是正品后，剩下 9 件中还有 6 件正品，故所求为 $\\frac{6}{9}=\\frac{2}{3}$。",
+      "rubric": [
+        {
+          "points": 3,
+          "for": "说明条件发生后剩余 9 件、其中正品 6 件（分母随条件缩小）。"
+        },
+        {
+          "points": 3,
+          "for": "得 $\\frac{2}{3}$。"
+        }
+      ],
+      "trap": "仍用原来的 10 件作分母得 7/10，或忘记不放回、把分母写成 9 却又用 7 作分子。"
+    }
+  ]
+}
+</script>
+
+<script>window.__PAPER__={"schema":"kaoqian/v2","meta":{"title":"第 3 章 条件概率与事件的独立性","course":"概率论与数理统计 · 期中练习","minutes":20,"total":20,"cover":["姓名","学号","班级"]},"sources":{"b":{"kind":"book","title":"概率论与数理统计（第 3 章笔记）","file":"示例-概率论-教材片段.txt"}},"blueprint":[{"type":"选择题","count":4,"points":2,"level":"理解"},{"type":"计算题","count":2,"points":6,"level":"应用"}],"topics":[{"id":"cond","name":"条件概率的分母","level":"应用","skill":"看到“已知……”，先把条件事件确定为分母，再从缩小后的样本空间数结果。","ref":{"source":"b","line":3,"quote":"定义 P(A|B) = P(AB)/P(B)，其中 P(B) > 0。"}},{"id":"mult","name":"乘法公式","level":"理解","skill":"由 P(A) 与 P(B|A) 求 P(AB)，用 P(AB) = P(A)P(B|A)。","ref":{"source":"b","line":4,"quote":"P(AB) = P(A|B)P(B)"}},{"id":"total","name":"全概率公式按划分求和","level":"应用","skill":"把结果事件按来源（车间、批次、类别）拆成互斥的几支，各支概率相加。","ref":{"source":"b","line":5,"quote":"若 B1, B2, …, Bn 构成样本空间的一个划分，且 P(Bi) > 0，则 P(A) = Σ P(A|Bi)P(Bi)。"}},{"id":"bayes","name":"贝叶斯公式还原来源","level":"应用","skill":"已知结果反推来历时，分母用全概率（结果发生的总概率），分子只用目标那一支。","ref":{"source":"b","line":6,"quote":"P(Bi|A) = P(A|Bi)P(Bi) / Σ P(A|Bj)P(Bj)，其中分母就是 P(A)。"}},{"id":"indep","name":"互斥与独立不是一回事","level":"理解","skill":"看到互斥就用 P(AB)=0，看到独立才用 P(AB)=P(A)P(B)，两者不能互换。","ref":{"source":"b","line":8,"quote":"P(A) > 0 且 P(B) > 0 时，互斥的两个事件一定不独立。"}}],"questions":[{"id":"q1","type":"选择题","ask":"设 $P(A)=0.5$，$P(B)=0.4$，$P(AB)=0.2$，则 $P(A|B)=$（　　）","options":["A. 0.2","B. 0.4","C. 0.5","D. 0.8"],"key":"C","topics":["cond"],"points":2,"answer":"C。$P(A|B)=\\frac{P(AB)}{P(B)}=\\frac{0.2}{0.4}=0.5$，条件 $B$ 作分母。","rubric":[{"points":2,"for":"选 C。"}],"trap":"A 的 0.2 是联合概率。若把分母写成 P(A)，则 0.2 ÷ 0.5 = 0.4，对应 B。"},{"id":"q2","type":"选择题","ask":"设 $0\u003cP(A)\u003c1$，$0\u003cP(B)\u003c1$，且 $A$ 与 $B$ 互斥，则（　　）","options":["A. A 与 B 一定相互独立","B. A 与 B 一定不相互独立","C. 无法判断是否独立","D. 当 P(A)+P(B)=1 时独立"],"key":"B","topics":["indep"],"points":2,"answer":"B。互斥给出 $P(AB)=0$，而 $P(A)P(B)>0$，故 $P(AB)\\ne P(A)P(B)$，一定不独立。","rubric":[{"points":2,"for":"选 B。"}],"trap":"把“互斥”和“独立”当成同一件事，误选 A。"},{"id":"q3","type":"选择题","ask":"设 $P(A)=0.6$，$P(B|A)=0.5$，则 $P(AB)=$（　　）","options":["A. 0.3","B. 0.5","C. 0.6","D. 1.1"],"key":"A","topics":["mult"],"points":2,"answer":"A。由乘法公式 $P(AB)=P(A)P(B|A)=0.6\\times0.5=0.3$。","rubric":[{"points":2,"for":"选 A。"}],"trap":"把 0.6 与 0.5 相加得 1.1（选 D），概率不可能大于 1。"},{"id":"q4","type":"选择题","ask":"某厂 70% 的产品来自甲生产线、30% 来自乙生产线，两条线次品率分别为 1% 和 4%。从全厂任取一件产品，它是次品的概率为（　　）","options":["A. 1.9%","B. 2.5%","C. 2.8%","D. 5%"],"key":"A","topics":["total"],"points":2,"answer":"A。$0.7\\times0.01+0.3\\times0.04=0.007+0.012=0.019$，即 1.9%。","rubric":[{"points":2,"for":"选 A。"}],"trap":"把两个次品率简单平均得 2.5%（选 B），丢掉产量占比这个权重。"},{"id":"q5","type":"计算题","ask":"甲、乙两条生产线分别占产量的 70% 和 30%。乙线次品率为 4%。要保证随机抽到的次品来自甲线的概率不超过 20%，甲线的次品率最多可为多少？说明临界值能否取到。","options":[],"topics":["bayes","total"],"points":6,"answer":"设甲线次品率为 $x$。次品来自甲线的条件概率为 $0.7x/(0.7x+0.012)$。分母恒正，由 $0.7x/(0.7x+0.012)\\le0.2$ 得 $0.56x\\le0.0024$，故 $x\\le3/700$。上限为 $3/700$（约 0.4286%），取等号时条件概率恰为 20%。","rubric":[{"points":2,"for":"据两条线的产量和次品率写出联合概率及全厂次品率。"},{"points":2,"for":"以抽到次品为条件列出后验概率的不等式。"},{"points":2,"for":"解出上限 3/700，说明等号对应 20%，上限能取到。"}],"trap":"20% 限制的是次品的来源比例，不能直接把它当成甲线本身的次品率。"},{"id":"q6","type":"计算题","ask":"袋中有 7 件正品和 3 件次品。不放回地随机取出两件。规则甲：检验员随机选其中一件展示，恰好展示了正品。规则乙：只要两件中有正品就展示一件正品，两件均为次品时展示次品。两种规则下，已知展示了正品，剩下一件也是正品的概率分别是多少？解释差异。","options":[],"topics":["cond"],"points":6,"answer":"规则甲随机展示一件，知道它是正品后，另一件等同于从剩余 9 件中抽取，正品还有 6 件，所以是 $6/9=2/3$。规则乙展示正品等价于抽出的两件至少一件为正品。两件都是正品的概率为 $7/10\\times6/9=7/15$，至少一件正品的概率为 $1-3/10\\times2/9=14/15$。两者之比为 $1/2$。一正一次的组合在规则甲下仅有一半机会展示正品，在规则乙下必定展示正品。","rubric":[{"points":2,"for":"就随机展示说明剩下 9 件的条件计数并得 2/3。"},{"points":2,"for":"将规则乙的观察转成至少有一件正品，并正确计算两件均正品与至少一件正品的概率。"},{"points":2,"for":"得规则乙为 1/2，说明混合组合在两种规则下展示正品的机会不同。"}],"trap":"两次都看到了正品，但展示者挑选物品的规则改变了已知条件。"}]};window.__PAPER_CHECKS__={"[\"b\",0,3,\"定义 P(A|B) = P(AB)/P(B)，其中 P(B) > 0。\"]":"ok","[\"b\",0,4,\"P(AB) = P(A|B)P(B)\"]":"ok","[\"b\",0,5,\"若 B1, B2, …, Bn 构成样本空间的一个划分，且 P(Bi) > 0，则 P(A) = Σ P(A|Bi)P(Bi)。\"]":"ok","[\"b\",0,6,\"P(Bi|A) = P(A|Bi)P(Bi) / Σ P(A|Bj)P(Bj)，其中分母就是 P(A)。\"]":"ok","[\"b\",0,8,\"P(A) > 0 且 P(B) > 0 时，互斥的两个事件一定不独立。\"]":"ok"};</script>
+<script>
+/* ============================ CORE:START ============================
+   以下是纯函数（不碰 DOM），可被 node 直接取出做单元测试。
+   ================================================================== */
+var CN = ['一','二','三','四','五','六','七','八','九','十','十一','十二'];
+
+function esc(s){
+  return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+
+function norm(s){
+  return String(s === null || s === undefined ? '' : s).normalize('NFKC').replace(/\s+/g,'').toLowerCase();
+}
+
+function num(v, dflt){
+  var n = Number(v);
+  return Number.isFinite(n) ? n : (dflt === undefined ? 0 : dflt);
+}
+
+/* ---------- 极简 TeX ---------- */
+var TEX_SYM = {
+  alpha:'α', beta:'β', gamma:'γ', delta:'δ', epsilon:'ε', varepsilon:'ε', zeta:'ζ', eta:'η',
+  theta:'θ', kappa:'κ', lambda:'λ', mu:'μ', nu:'ν', xi:'ξ', pi:'π', rho:'ρ', sigma:'σ', tau:'τ',
+  phi:'φ', varphi:'φ', chi:'χ', psi:'ψ', omega:'ω',
+  Gamma:'Γ', Delta:'Δ', Theta:'Θ', Lambda:'Λ', Xi:'Ξ', Pi:'Π', Sigma:'Σ', Phi:'Φ', Psi:'Ψ', Omega:'Ω',
+  times:'×', cdot:'·', div:'÷', pm:'±', mp:'∓', le:'≤', leq:'≤', ge:'≥', geq:'≥', ne:'≠', neq:'≠',
+  approx:'≈', equiv:'≡', sim:'∼', propto:'∝', infty:'∞', to:'→', rightarrow:'→', leftarrow:'←',
+  Rightarrow:'⇒', Leftrightarrow:'⇔', in:'∈', notin:'∉', subset:'⊂', subseteq:'⊆', supset:'⊃',
+  cup:'∪', cap:'∩', emptyset:'∅', varnothing:'∅', forall:'∀', exists:'∃', partial:'∂', nabla:'∇',
+  sum:'Σ', prod:'∏', int:'∫', iint:'∬', oint:'∮', angle:'∠', perp:'⊥', parallel:'∥',
+  therefore:'∴', because:'∵', ldots:'…', cdots:'⋯', dots:'…', prime:'′', degree:'°', '%':'%',
+  quad:'\u2003', qquad:'\u2003\u2003', '{':'{', '}':'}', '|':'|'
+};
+var TEX_FUNC = {sin:1,cos:1,tan:1,cot:1,sec:1,csc:1,log:1,ln:1,lg:1,exp:1,lim:1,max:1,min:1,det:1,
+  dim:1,gcd:1,sup:1,inf:1,arg:1,deg:1,mod:1,bmod:1,arcsin:1,arccos:1,arctan:1};
+
+function renderTex(src){
+  var s = String(src === null || src === undefined ? '' : src);
+  var i = 0;
+  function skipWs(){ while (i < s.length && /\s/.test(s.charAt(i))) i++; }
+  function arg(){
+    skipWs();
+    if (i >= s.length) return '';
+    var c = s.charAt(i);
+    if (c === '{'){
+      var depth = 0, start = i + 1;
+      while (i < s.length){
+        var ch = s.charAt(i);
+        if (ch === '{') depth++;
+        else if (ch === '}'){ depth--; if (depth === 0){ var inner = s.slice(start, i); i++; return inner; } }
+        i++;
+      }
+      return s.slice(start);
+    }
+    if (c === '\\'){
+      var m = /^\\[a-zA-Z]+/.exec(s.slice(i));
+      if (m){ i += m[0].length; return m[0]; }
+    }
+    i++;
+    return c;
+  }
+  var out = '';
+  while (i < s.length){
+    var c = s.charAt(i);
+    if (c === '\\'){
+      i++;
+      var m2 = /^[a-zA-Z]+/.exec(s.slice(i));
+      var name;
+      if (m2){ name = m2[0]; i += name.length; } else { name = s.charAt(i) || ''; i++; }
+      if (name === 'frac'){
+        var a = arg(), b = arg();
+        out += '<span class="frac"><span class="fn">' + renderTex(a) + '</span><span class="fd">' + renderTex(b) + '</span></span>';
+      } else if (name === 'sqrt'){
+        out += '<span class="sqrt"><span class="rad">' + renderTex(arg()) + '</span></span>';
+      } else if (name === 'text' || name === 'mathrm' || name === 'textrm' || name === 'operatorname' || name === 'mathbf'){
+        out += esc(arg());
+      } else if (name === 'left' || name === 'right' || name === 'displaystyle' || name === 'textstyle' || name === 'limits' || name === 'big' || name === 'Big'){
+        /* 忽略 */
+      } else if (name === ',' || name === ';' || name === ':' || name === '!' || name === ' '){
+        out += '<span style="display:inline-block;width:.18em"></span>';
+      } else if (name === '\\'){
+        out += '<br>';
+      } else if (Object.prototype.hasOwnProperty.call(TEX_SYM, name)){
+        out += TEX_SYM[name];
+      } else if (TEX_FUNC[name]){
+        out += '<span class="fn-name">' + esc(name) + '</span>';
+      } else {
+        out += '<span class="tex-bad">\\' + esc(name) + '</span>';
+      }
+      continue;
+    }
+    if (c === '{'){ out += renderTex(arg()); continue; }
+    if (c === '^' || c === '_'){
+      i++;
+      out += (c === '^' ? '<sup>' : '<sub>') + renderTex(arg()) + (c === '^' ? '</sup>' : '</sub>');
+      continue;
+    }
+    if (/[a-zA-Z]/.test(c)){ out += '<i>' + esc(c) + '</i>'; i++; continue; }
+    out += esc(c);
+    if ('=+−-×÷≈≠≤≥<>／/'.indexOf(c) >= 0) out += '<wbr>';
+    i++;
+  }
+  return out;
+}
+
+function rich(v){
+  var s = String(v === null || v === undefined ? '' : v);
+  var i = 0, out = '';
+  while (i < s.length){
+    if (s.charAt(i) === '$'){
+      if (s.charAt(i + 1) === '$'){
+        var j2 = s.indexOf('$$', i + 2);
+        if (j2 > i){ out += '<span class="tex-block">' + renderTex(s.slice(i + 2, j2)) + '</span>'; i = j2 + 2; continue; }
+      } else {
+        var j = s.indexOf('$', i + 1);
+      if (j > i + 1){
+        var formula = s.slice(i + 1, j);
+        var style = formula.length <= 32 ? 'tex short-formula' : 'tex';
+        out += '<span class="' + style + '">' + renderTex(formula) + '</span>';
+        i = j + 1; continue;
+      }
+      }
+    }
+    out += esc(s.charAt(i));
+    i++;
+  }
+  return out;
+}
+
+/* ---------- 规范化 ---------- */
+var TYPE_ALIAS = {
+  '选择':'选择题','单选':'选择题','多选':'选择题','单选/多选':'选择题',
+  '计算':'计算题','填空':'填空题','简答':'简答题','论述':'论述题','判断':'判断题',
+  '证明':'证明题','解答':'解答题','应用':'应用题','综合':'综合题','分析':'分析题','名词解释':'名词解释题'
+};
+
+function canonType(t){
+  var v = String(t === null || t === undefined ? '' : t).trim();
+  if (!v) return '解答题';
+  if (TYPE_ALIAS[v]) return TYPE_ALIAS[v];
+  return v;
+}
+
+function normaliseRef(r){
+  if (!r || typeof r !== 'object') return {source:'', page:0, line:0, quote:''};
+  var page = num(r.page !== undefined && r.page !== null ? r.page : r.at, 0);
+  var line = num(r.line, 0);
+  return {source:String(r.source === undefined || r.source === null ? '' : r.source), page:page, line:line,
+          quote:String(r.quote === undefined || r.quote === null ? '' : r.quote).trim()};
+}
+
+function normaliseSpec(raw){
+  var r = (raw && typeof raw === 'object') ? raw : {};
+  var m = (r.meta && typeof r.meta === 'object') ? r.meta : {};
+  var srcIn = (r.sources && typeof r.sources === 'object') ? r.sources : {};
+  var sources = {};
+  Object.keys(srcIn).forEach(function(k){
+    var v = srcIn[k] || {};
+    sources[k] = {kind:String(v.kind || 'book'), title:String(v.title || ''), file:String(v.file || ''),
+                  url:String(v.url || '')};
+  });
+  var totalRaw = (m.total !== undefined && m.total !== null) ? m.total
+               : ((r.total !== undefined && r.total !== null) ? r.total : null);
+  var total = null;
+  if (totalRaw !== null && String(totalRaw).trim() !== '' && Number.isFinite(Number(totalRaw))) total = Number(totalRaw);
+  var cover = Array.isArray(m.cover) ? m.cover : (Array.isArray(r.cover) ? r.cover : ['姓名','学号','班级']);
+  var qsIn = Array.isArray(r.questions) ? r.questions : [];
+  var tpsIn = Array.isArray(r.topics) ? r.topics : [];
+  return {
+    schema: 'kaoqian/v2',
+    meta: {
+      difficulty: Object.hasOwn(LEVELS,m.difficulty) ? m.difficulty : '',
+      title: String(m.title !== undefined && m.title !== null ? m.title : (r.title || '')).trim(),
+      course: String(m.course !== undefined && m.course !== null ? m.course : (r.course || '')).trim(),
+      minutes: num(m.minutes !== undefined && m.minutes !== null ? m.minutes : r.minutes, 0),
+      total: total,
+      cover: cover.map(String)
+    },
+    sources: sources,
+    blueprint: (Array.isArray(r.blueprint) ? r.blueprint : []).map(function(b){
+      b = b || {};
+      return {type:canonType(b.type), count:num(b.count,0), points:num(b.points,0), level:String(b.level || '')};
+    }),
+    topics: tpsIn.map(function(t){
+      t = t || {};
+      return {id:String(t.id === undefined || t.id === null ? '' : t.id).trim(),
+              name:String(t.name === undefined || t.name === null ? '' : t.name).trim(),
+              level:String(t.level === undefined || t.level === null ? '' : t.level).trim(),
+              skill:String(t.skill === undefined || t.skill === null ? '' : t.skill).trim(),
+              ref: normaliseRef(t.ref)};
+    }),
+    questions: qsIn.map(function(q, idx){
+      q = q || {};
+      var rub = Array.isArray(q.rubric) ? q.rubric : [];
+      return {
+        id: String(q.id === undefined || q.id === null ? ('q' + (idx + 1)) : q.id),
+        type: canonType(q.type),
+        ask: String(q.ask === undefined || q.ask === null ? '' : q.ask).trim(),
+        options: Array.isArray(q.options) ? q.options.map(String) : [],
+        key: (q.key === undefined || q.key === null) ? '' : String(q.key).trim(),
+        accept: Array.isArray(q.accept) ? q.accept.map(String) : [],
+        topics: Array.isArray(q.topics) ? q.topics.map(String) : [],
+        points: num(q.points, 0),
+        answer: String(q.answer === undefined || q.answer === null ? '' : q.answer).trim(),
+        rubric: rub.map(function(x){
+          x = x || {};
+          return {points:num(x.points,0), 'for': String(x['for'] !== undefined && x['for'] !== null ? x['for'] : (x.reason || '')).trim()};
+        }),
+        trap: String(q.trap === undefined || q.trap === null ? '' : q.trap).trim()
+      };
+    })
+  };
+}
+
+function effectiveTotal(spec){
+  var s = spec.questions.reduce(function(a, q){ return a + q.points; }, 0);
+  return (spec.meta.total === null || spec.meta.total === undefined) ? s : spec.meta.total;
+}
+
+/* ---------- 体检 ---------- */
+function validate(spec){
+  var out = [];
+  function err(m){ out.push({level:'error', msg:m}); }
+  function warn(m){ out.push({level:'warn', msg:m}); }
+  if (!spec || !spec.questions){ err('没有读到题库内容。'); return out; }
+  var qs = spec.questions, ts = spec.topics;
+  if (!qs.length) err('题库里没有题目（questions 为空）。');
+  if (!spec.meta.title) err('缺少卷名（meta.title）。');
+  if (!spec.meta.course) warn('缺少课程名（meta.course），卷头会空着。');
+  if (!(spec.meta.minutes > 0)) warn('没有声明建议时长（meta.minutes）。');
+  var sum = qs.reduce(function(a,q){ return a + q.points; }, 0);
+  if (spec.meta.total === null || spec.meta.total === undefined){
+    warn('没有声明总分（meta.total），已按各题合计 ' + sum + ' 分显示。');
+  } else if (spec.meta.total !== sum){
+    err('总分写的是 ' + spec.meta.total + ' 分，但各题加起来是 ' + sum + ' 分。');
+  }
+  var ids = {};
+  ts.forEach(function(t){
+    if (!t.id) err('有考点缺少 id。');
+    if (ids[t.id]) err('考点 id 重复：' + t.id);
+    ids[t.id] = t;
+    if (!t.name) err('考点 ' + t.id + ' 缺少名称（name）。');
+    if (!t.level) warn('考点「' + (t.name || t.id) + '」没标认知层级（level）。');
+  });
+  var used = {};
+  qs.forEach(function(q, n){
+    var tag = '第 ' + (n + 1) + ' 题';
+    if (!q.ask) err(tag + '没有题干（ask）。');
+    if (!(q.points > 0)) err(tag + '的分值必须大于 0。');
+    if (!q.answer) err(tag + '没有参考答案（answer）。');
+    if (!q.rubric.length) err(tag + '没有评分点（rubric）。');
+    var rs = q.rubric.reduce(function(a, r){ return a + r.points; }, 0);
+    if (q.rubric.length && rs !== q.points) err(tag + '评分点合计 ' + rs + ' 分，与题分 ' + q.points + ' 分不符。');
+    q.rubric.forEach(function(r){ if (!r['for']) err(tag + '有评分点没写“给分理由”（for）。'); });
+    if (!q.topics.length) err(tag + '没有挂考点（topics）。');
+    q.topics.forEach(function(k){
+      if (!ids[k]) err(tag + '引用了不存在的考点：' + k);
+      used[k] = 1;
+    });
+    if (q.type === '选择题'){
+      if (q.options.length < 2) err(tag + '是选择题，但选项少于 2 个。');
+      var letters = q.options.map(function(o){ return String(o).trim().charAt(0).toUpperCase(); });
+      if (!q.key) err(tag + '是选择题，但没写正确答案（key）。');
+      else if (letters.indexOf(q.key.toUpperCase()) < 0) err(tag + '的 key“' + q.key + '”不在选项里（选项要以 A/B/C/D 开头）。');
+    }
+    if (!q.trap) warn(tag + '没有写“易错处”（trap），教师版会空着。');
+    q.topics.forEach(function(k){
+      var t = ids[k];
+      if (!t) return;
+      var rf = t.ref;
+      if (!rf.source || rf.source === 'none'){
+        warn('考点「' + (t.name || k) + '」没有标注教材出处。');
+        return;
+      }
+      if (!(rf.page > 0) && !(rf.line > 0)) err('考点「' + (t.name || k) + '」的出处缺少页码（page）或行号（line）。');
+      if (!rf.quote) err('考点「' + (t.name || k) + '」的出处缺少原文（quote），没法核对。');
+      if (!spec.sources[rf.source]) err('考点「' + (t.name || k) + '」引用了不存在的材料：' + rf.source);
+    });
+  });
+  ts.forEach(function(t){ if (!used[t.id]) err('考点「' + (t.name || t.id) + '」一道题都没用上，每个考点至少要有一道题。'); });
+  var seen = {};
+  qs.forEach(function(q, n){
+    var k = norm(q.ask);
+    if (!k) return;
+    if (seen[k] !== undefined) err('第 ' + (n + 1) + ' 题与第 ' + (seen[k] + 1) + ' 题题干重复。');
+    else seen[k] = n;
+  });
+  qs.forEach(function(q, n){
+    var stem = norm(q.ask);
+    var a = norm(q.answer).replace(/[。，、；：""''（）()【】\[\]]/g, '');
+    if (a.length >= 8 && stem.indexOf(a) >= 0){
+      err('第 ' + (n + 1) + ' 题的题干里直接出现了参考答案。');
+      return;
+    }
+    var cjk = function(v){ return String(v).replace(/[^\u4e00-\u9fa5]/g, ''); };
+    var ca = cjk(q.answer), cs = cjk(q.ask);
+    if (ca.length >= 8){
+      for (var k = 0; k + 8 <= ca.length; k++){
+        var g = ca.substr(k, 8);
+        if (cs.indexOf(g) >= 0){
+          warn('第 ' + (n + 1) + ' 题的题干疑似把参考思路写进去了（「' + g + '……」），请确认没泄露答案。');
+          return;
+        }
+      }
+    }
+  });
+  if (spec.blueprint.length){
+    spec.blueprint.forEach(function(b){
+      var same = qs.filter(function(q){ return q.type === b.type; });
+      if (!same.length) err('题型「' + b.type + '」在 blueprint 里声明了，但没有这种题。');
+      if (same.length && same.length !== b.count) warn('题型「' + b.type + '」声明 ' + b.count + ' 题，实际 ' + same.length + ' 题。');
+      if (b.points && same.some(function(q){ return q.points !== b.points; }))
+        warn('题型「' + b.type + '」声明每题 ' + b.points + ' 分，但有题目分值不同。');
+    });
+  }
+  if (spec.meta.minutes > 0 && sum > 0){
+    var per = spec.meta.minutes / sum;
+    if (per < 0.8) warn('平均只有 ' + per.toFixed(2) + ' 分钟/分，可能做不完（建议 1 分 ≈ 1 分钟）。');
+  }
+  return out;
+}
+
+/* ---------- 排版计算 ---------- */
+function spaceFor(type, points){
+  var p = Math.max(1, num(points, 1));
+  switch (type){
+    case '选择题': case '判断题': return 3;
+    case '填空题': return Math.max(12, 6 + p * 3);
+    case '计算题': return 16 + p * 2.6;
+    case '证明题': return 20 + p * 2.8;
+    case '简答题': return 16 + p * 2.4;
+    case '论述题': case '分析题': return 20 + p * 2.6;
+    default: return 16 + p * 2.4;
+  }
+}
+
+function groupQuestions(spec){
+  var order = [], map = {};
+  spec.questions.forEach(function(q){
+    if (!map[q.type]){ map[q.type] = []; order.push(q.type); }
+    map[q.type].push(q);
+  });
+  var bp = spec.blueprint.map(function(b){ return b.type; }).filter(function(t){ return !!map[t]; });
+  var types = bp.concat(order.filter(function(t){ return bp.indexOf(t) < 0; }));
+  var n = 0;
+  return types.map(function(t){
+    var items = (map[t] || []).map(function(q){ return {q:q, num: ++n}; });
+    var pts = items.reduce(function(a, x){ return a + x.q.points; }, 0);
+    return {type:t, items:items, points:pts};
+  });
+}
+
+function citeLabel(spec, ref){
+  if (!ref || !ref.source || ref.source === 'none') return '未注明教材出处';
+  var src = spec.sources[ref.source];
+  var title = src && src.title ? src.title : ref.source;
+  var loc = '';
+  if (ref.page > 0) loc = 'PDF 第 ' + ref.page + ' 页';
+  else if (ref.line > 0) loc = '第 ' + ref.line + ' 行';
+  return esc(title) + (loc ? ' · ' + loc : '');
+}
+
+/* ---------- 渲染 ---------- */
+function qHtml(item){
+  var q = item.q;
+  var opts = q.options.length
+    ? '<ol class="opts ' + (q.options.every(function(o){return o.length <= 10;}) ? 'short' : q.options.every(function(o){return o.length <= 22;}) ? 'medium' : '') + '">' + q.options.map(function(o){ return '<li>' + rich(o) + '</li>'; }).join('') + '</ol>'
+    : '';
+  var h = spaceFor(q.type, q.points);
+  var tight = q.type === '填空题' ? ' tight' : '';
+  return '<article class="q"><div class="qh"><b>' + item.num + '.</b><span class="pts">' + q.points + ' 分</span></div>'
+       + '<div class="ask">' + rich(q.ask) + '</div>' + opts
+       + '<div class="space' + tight + '" style="height:' + h.toFixed(1) + 'mm"></div></article>';
+}
+
+function headHtml(spec){
+  var total = effectiveTotal(spec);
+  var cover = (spec.meta.cover && spec.meta.cover.length ? spec.meta.cover : ['姓名','学号','班级'])
+    .map(function(c){ return '<span>' + esc(c) + ' <i></i></span>'; }).join('');
+  return '<div class="imprint"><span>考前一卷</span><span>原创章节模拟卷</span></div>'
+       + '<h1>' + esc(spec.meta.title || '未命名模拟卷') + '</h1>'
+       + '<p class="course">' + esc(spec.meta.course || '') + '</p>'
+       + '<div class="meta">' + spec.questions.length + ' 题　·　' + total + ' 分'
+       + (spec.meta.difficulty ? '　·　' + esc(spec.meta.difficulty) : '')
+       + (spec.meta.minutes > 0 ? '　·　建议 ' + spec.meta.minutes + ' 分钟' : '') + '</div>'
+       + '<div class="cover">' + cover + '</div>';
+}
+
+function answersHtml(spec, layout, settings){
+  var blocks = layout.map(function(g){
+    return g.items.map(function(item){
+      var q = item.q;
+      var rub = q.rubric.map(function(r){ return '<li><b>' + r.points + ' 分</b>　' + rich(r['for']) + '</li>'; }).join('');
+      var notes = q.topics.map(function(k){
+        var t = spec.topics.filter(function(x){ return x.id === k; })[0];
+        if (!t) return '';
+        return '<li><b>' + esc(t.name) + '</b>　' + rich(t.skill || '')
+             + '<br><span class="src">' + citeLabel(spec, t.ref) + '</span></li>';
+      }).join('');
+      return '<div class="key"><h3>第 ' + item.num + ' 题 <small>' + q.points + ' 分</small></h3>'
+           + '<p>' + rich(q.answer) + '</p>'
+           + '<h4>评分点</h4><ul>' + rub + '</ul>'
+           + (q.trap ? '<h4>易错处</h4><p>' + rich(q.trap) + '</p>' : '')
+           + '<h4>回教材看哪里</h4><ul class="src">' + notes + '</ul></div>';
+    }).join('');
+  }).join('');
+
+  var rows = spec.topics.map(function(t){
+    var cells = [], sum = 0;
+    layout.forEach(function(g){ g.items.forEach(function(item){
+      if (item.q.topics[0] === t.id){ cells.push(item.num + '（' + item.q.points + ' 分）'); sum += item.q.points; }
+      else if (item.q.topics.includes(t.id)){cells.push(item.num + '（关联）');}
+    }); });
+    return '<tr><td>' + esc(t.name) + '</td><td>' + esc(t.level || '—') + '</td><td>'
+         + (cells.join('、') || '—') + '</td><td class="c">' + sum + '</td></tr>';
+  }).join('');
+
+  var citeMap = {}, citeRows = '';
+  layout.forEach(function(g){ g.items.forEach(function(item){
+    item.q.topics.forEach(function(k){
+      var t = spec.topics.filter(function(x){ return x.id === k; })[0];
+      if (!t) return;
+      var key = t.ref.source + '|' + t.ref.page + '|' + t.ref.line + '|' + t.ref.quote;
+      if (!citeMap[key]) citeMap[key] = {ref:t.ref, nums:[], names:[]};
+      var e = citeMap[key];
+      if (e.nums.indexOf(item.num) < 0) e.nums.push(item.num);
+      if (e.names.indexOf(t.name) < 0) e.names.push(t.name);
+    });
+  }); });
+  Object.keys(citeMap).forEach(function(key){
+    var e = citeMap[key];
+    citeRows += '<tr><td>' + citeLabel(spec, e.ref) + '<br>' + esc(checkLabel(settings.checks[refKey(e.ref)])) + '</td><td class="quote">' + esc(e.ref.quote || '—')
+              + '</td><td>' + esc(e.names.join('、')) + '</td><td class="c">' + e.nums.join('、') + '</td></tr>';
+  });
+
+  return '<section class="answers"><h2>' + esc(spec.meta.title) + ' · 参考答案与评分点</h2>' + blocks
+       + (settings.matrix ? '<h2>双向细目表</h2>'
+       + '<table class="mat"><thead><tr><th>考点</th><th>认知层级</th><th>题号（分值）</th><th class="c">小计</th></tr></thead><tbody>'
+       + rows + '</tbody></table>' : '')
+       + (settings.cites ? '<h2>引文核对表</h2>'
+       + '<p style="font-size:9.5pt;color:#444;margin:0 0 2mm">出卷时引用的教材原文，请按页码或行号对照原件抽查一遍：题干与答案是否真的由这段原文支撑。</p>'
+       + '<table class="mat"><thead><tr><th>教材 · 位置</th><th>原文</th><th>支撑考点</th><th class="c">用于第几题</th></tr></thead><tbody>'
+       + (citeRows || '<tr><td colspan="4">（本卷没有标注教材出处）</td></tr>') + '</tbody></table>' : '') + '</section>';
+}
+
+function renderPaper(spec, mode, settings){
+  settings = settings || {only:false, matrix:false, cites:false, checks:{}};
+  if (!spec || !spec.questions.length){
+    return '<div class="empty"><b>还没有载入题库</b>'
+         + '把 AI 给的 JSON 粘进来，或把一个 <code>.json</code> 文件拖进窗口。<br>'
+         + '第一次用？点右上角<b>「看示例」</b>。</div>';
+  }
+  var layout = groupQuestions(spec);
+  var body = layout.map(function(g, gi){
+    var per = g.items.length ? g.items[0].q.points : 0;
+    var same = g.items.every(function(x){ return x.q.points === per; });
+    var sub = '共 ' + g.items.length + ' 题' + (same && per ? '，每题 ' + per + ' 分' : '') + '，共 ' + g.points + ' 分';
+    return '<section class="group"><div class="group-start"><h2>' + (CN[gi] || (gi + 1)) + '、' + esc(g.type)
+         + '<small>' + sub + '</small></h2>'
+         + qHtml(g.items[0]) + '</div>' + g.items.slice(1).map(qHtml).join('') + '</section>';
+  }).join('');
+  if (mode === 'teacher' && settings.only) return answersHtml(spec, layout, settings);
+  return headHtml(spec) + body + (mode === 'teacher' ? answersHtml(spec, layout, settings) : '');
+}
+
+function refKey(ref){return JSON.stringify([ref.source, ref.page, ref.line, ref.quote]);}
+function checkLabel(status){return status === 'ok' ? '已对上原件文字' : status === 'mismatch' ? '与原件不符' : '待核对原件';}
+function checkText(spec, source, text){
+  var lines = text.replace(/^\uFEFF/,'').split(/\r\n|\n|\r/);
+  var checks = {};
+  spec.topics.forEach(function(topic){
+    var ref = topic.ref;
+    if (ref.source !== source || !ref.line || ref.page) return;
+    checks[refKey(ref)] = lines[ref.line - 1] && lines[ref.line - 1].includes(ref.quote) ? 'ok' : 'mismatch';
+  });
+  return checks;
+}
+function receiptIssues(spec, checks){
+  var pending = 0, issues = [];
+  spec.topics.forEach(function(t){
+    if (!t.ref.source || t.ref.source === 'none') return;
+    var status = checks[refKey(t.ref)];
+    if (status === 'mismatch') issues.push({level:'error',msg:'「' + t.name + '」引文与指定原件的位置不符。'});
+    else if (status !== 'ok') pending++;
+  });
+  if (pending) issues.push({level:'warn',msg:pending + ' 个考点的出处待核对原件。'});
+  return issues;
+}
+
+/* ---------- 分批合并 ---------- */
+function appendSpec(base, inc){
+  var out = JSON.parse(JSON.stringify(base));
+  Object.keys(inc.sources).forEach(function(k){ if (!out.sources[k]) out.sources[k] = inc.sources[k]; });
+  inc.topics.forEach(function(t){
+    if (!out.topics.some(function(x){ return x.id === t.id; })) out.topics.push(t);
+  });
+  out.questions = out.questions.concat(inc.questions);
+  if (!out.meta.title && inc.meta.title) out.meta.title = inc.meta.title;
+  if (!out.meta.course && inc.meta.course) out.meta.course = inc.meta.course;
+  if (!(out.meta.minutes > 0) && inc.meta.minutes > 0) out.meta.minutes = inc.meta.minutes;
+  if (!out.blueprint.length && inc.blueprint.length) out.blueprint = inc.blueprint;
+  return out;
+}
+
+function importPaper(current, batch, raw){
+  var inc = normaliseSpec(raw);
+  if (!inc.questions.length) throw new Error('本批缺少题目，请让 AI 重发完整题库。');
+  if (raw.part === undefined && raw.of === undefined) return {spec:inc, batch:null};
+  var part = raw.part, of = raw.of;
+  if (!Number.isInteger(part) || !Number.isInteger(of) || part < 1 || part > of)
+    throw new Error('批次应为 1 到总批数之间的整数。');
+  if (!inc.meta.title || !inc.meta.course) throw new Error('各批必须带相同的卷名和课程名。');
+  var key = JSON.stringify([String(raw.paperId || ''), inc.meta.course, inc.meta.title, of]);
+  if (part === 1){
+    if (batch && key === batch.key && batch.first === JSON.stringify(inc))
+      throw new Error('第 1 批已载入。可接着载入下一批。');
+    return {spec:inc, batch:{key:key, part:1, of:of, first:JSON.stringify(inc)}};
+  }
+  if (!batch || batch.key !== key) throw new Error('这批不属于当前卷子。请先载入同一卷的第 1 批。');
+  if (part <= batch.part) throw new Error('第 ' + part + ' 批已载入，无需再加一次。');
+  if (part !== batch.part + 1) throw new Error('请先载入第 ' + (batch.part + 1) + ' 批。');
+  if (current.meta.total !== inc.meta.total) throw new Error('每批 meta.total 都应填写相同的全卷总分。');
+  if (current.meta.difficulty !== inc.meta.difficulty) throw new Error('不同批次的整卷难度不一致。');
+  for (var source of Object.keys(inc.sources)){
+    if (Object.hasOwn(current.sources,source) && JSON.stringify(current.sources[source]) !== JSON.stringify(inc.sources[source]))
+      throw new Error('不同批次给了不同的材料信息，请检查卷号。');
+  }
+  for (var topic of inc.topics){
+    var old = current.topics.find(function(t){return t.id === topic.id;});
+    if (old && JSON.stringify(old) !== JSON.stringify(topic)) throw new Error('同一考点在不同批次的内容不一致。');
+  }
+  var seen = new Set(current.questions.map(function(q){return q.id;}));
+  for (var q of inc.questions){
+    if (seen.has(q.id)) throw new Error('题号 ' + q.id + ' 重复，请让 AI 为整卷连续编号。');
+    seen.add(q.id);
+  }
+  return {spec:appendSpec(current, inc), batch:Object.assign({},batch,{part:part})};
+}
+
+var LEVELS = {
+  '基础巩固':'每题练一个知识点，给出直接条件，重点练定义、公式和典型步骤。',
+  '标准模拟':'把本章知识用到新情境中，自己判断解法，并解释选择依据。',
+  '提高挑战':'在本章范围内反推条件、比较方案或组合知识点。提高推理要求，保留合理计算量。'
+};
+
+function selectedQuestions(spec, input){
+  var items = groupQuestions(spec).flatMap(function(group){return group.items;});
+  var selected = new Set();
+  for (var token of input.trim().split(/[\s,，、]+/)){
+    var range = /^(\d+)(?:[-至–](\d+))?$/.exec(token);
+    if (!range) throw new Error('请填卷面题号，例如 5-6 或 2、5。');
+    var first = Number(range[1]), last = Number(range[2] || range[1]);
+    if (first < 1 || last > items.length || first > last) throw new Error('题号超出当前试卷范围。');
+    for (var n=first; n<=last; n++) selected.add(n);
+  }
+  return items.filter(function(item){return selected.has(item.num);});
+}
+
+function applyRevision(spec, patch, targetIds){
+  if (!spec || patch?.title !== spec.meta.title || patch.course !== spec.meta.course)
+    throw new Error('换题结果与当前卷名或课程不符。');
+  var entries = patch.replacements;
+  if (!Array.isArray(entries) || !targetIds.length || entries.length !== targetIds.length ||
+      new Set(entries.map(item=>item.id)).size !== entries.length || entries.some(item=>!targetIds.includes(item.id)))
+    throw new Error('返回的题目与指定题号不同。');
+  var ids = spec.questions.map(q=>q.id);
+  if (new Set(ids).size !== ids.length || targetIds.some(id=>!ids.includes(id))) throw new Error('当前试卷的题目 ID 缺失或重复。');
+  var questions = spec.questions.map(function(original){
+    var item = entries.find(entry=>entry.id === original.id);
+    if (!item) return original;
+    var fields = item.changes;
+    if (original.ask !== item.before || !fields || original.ask === fields.ask) throw new Error('原题干不匹配或题目未改，请使用当前版试卷。');
+    var required = ['ask','answer','rubric','trap'];
+    if (original.type === '选择题') required.push('options','key');
+    if (original.accept.length) required.push('accept');
+    if (required.some(k=>!Object.hasOwn(fields,k)) || Object.keys(fields).some(k=>k!=='accept' && !required.includes(k)))
+      throw new Error('换题缺必要字段，或试图改变分值、题型等固定内容。');
+    if (['ask','answer','trap'].some(k=>typeof fields[k]!=='string' || !fields[k].trim()) ||
+        !Array.isArray(fields.rubric) || !fields.rubric.length ||
+        fields.rubric.some(r=>!r || !Number.isFinite(r.points) || r.points<0 || !String(r.for || '').trim()) ||
+        (fields.accept !== undefined && !Array.isArray(fields.accept))) throw new Error('请补全新题、答案和评分点。');
+    if (original.type === '选择题' && (!Array.isArray(fields.options) || fields.options.length<2 ||
+        fields.options.some(o=>typeof o!=='string') || typeof fields.key!=='string' ||
+        new Set(fields.options.map(o=>o.trim()[0]?.toUpperCase())).size!==fields.options.length))
+      throw new Error('选择题需提供完整选项和正确字母。');
+    return {...original,...fields};
+  });
+  var result = {...spec,questions:questions};
+  var error = validate(result).find(i=>i.level==='error');
+  if (error) throw new Error(error.msg);
+  return result;
+}
+
+function parseLoose(text){
+  var t = String(text === null || text === undefined ? '' : text).replace(/^\uFEFF/, '').trim();
+  var fence = t.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fence) t = fence[1].trim();
+  if (!t.startsWith('[')){
+    var a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a >= 0 && b > a) t = t.slice(a, b + 1);
+  }
+  return JSON.parse(t);
+}
+/* ============================= CORE:END ============================= */
+
+/* ============================ 界面层 ============================ */
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var state = {spec:null, batch:null, checks:{}, mode:'student'};
+  var STORE = 'kaoqian.v1.1';
+  var embeddedText = $('paper-data').textContent.trim();
+  var embeddedError = '';
+  if (embeddedText){
+    try {window.__PAPER__ = JSON.parse(embeddedText);}
+    catch(e){embeddedError = '预装题库格式不完整，请让 AI 重新生成卷子。';}
+  }
+  var prompts = JSON.parse($('chat-prompts').textContent || 'null');
+  var showingHome = !!prompts && !window.__PAPER__ && !embeddedError;
+
+  async function copyText(text, message){
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(message);
+      return;
+    } catch(e){
+      var dialog = $('manualCopy'), field = $('manualText');
+      field.value = text;
+      if (!dialog.open) dialog.showModal();
+      field.focus();
+      field.select();
+      try {
+        if (document.execCommand('copy')) {dialog.close(); toast(message);}
+      } catch(ignored){ /* Keep the selected text available for a manual copy. */ }
+    }
+  }
+
+  function toast(msg, ms){
+    var el = $('toast');
+    el.textContent = msg;
+    el.classList.add('on');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function(){ el.classList.remove('on'); }, ms || 2600);
+  }
+
+  function save(){
+    try { if (state.spec && !window.__PAPER__) localStorage.setItem(STORE, JSON.stringify({spec:state.spec,batch:state.batch})); } catch(e){}
+  }
+
+  function paint(){
+    var spec = state.spec;
+    $('home').hidden = !showingHome;
+    $('btnHome').hidden = !prompts || showingHome;
+    $('btnResume').hidden = !showingHome || !spec;
+    document.body.classList.toggle('home-open',showingHome);
+    document.querySelectorAll('.seg button').forEach(function(button){
+      button.classList.toggle('on', button.dataset.mode === state.mode);
+      button.setAttribute('aria-pressed',String(button.dataset.mode === state.mode));
+    });
+    var incomplete = state.batch && state.batch.part < state.batch.of;
+    var issues = spec ? validate(spec).concat(receiptIssues(spec,state.checks)) : [];
+    if (incomplete) issues = [{level:'warn',msg:'已收到 ' + state.batch.part + '/' + state.batch.of + ' 批，请继续载入下一批后再打印。'}];
+    var errs = issues.filter(function(x){ return x.level === 'error'; });
+    $('revision').hidden = !prompts || !spec || !!incomplete || !!errs.length;
+    var warns = issues.filter(function(x){ return x.level === 'warn'; });
+    document.body.classList.toggle('ready-paper',!!window.__PAPER__ && !!spec && !prompts && !errs.length && !incomplete);
+
+    var settings = {only:$('onlyAnswers').checked,matrix:$('withMatrix').checked,cites:$('withCites').checked,checks:state.checks};
+    $('sheet').innerHTML = renderPaper(spec, state.mode, settings);
+    $('teacherTools').hidden = state.mode !== 'teacher';
+    document.body.classList.toggle('answer-only',state.mode === 'teacher' && settings.only);
+    document.body.classList.toggle('print-blocked',showingHome || !spec || !!incomplete || errs.length > 0);
+    var previousKey = $('sourceKey').value;
+    $('sourceKey').replaceChildren();
+    Object.entries(spec ? spec.sources : {}).forEach(function(pair){
+      $('sourceKey').add(new Option(pair[1].title || pair[0],pair[0]));
+    });
+    if (spec && Object.hasOwn(spec.sources,previousKey)) $('sourceKey').value = previousKey;
+    $('sourceTools').hidden = !spec || !$('sourceKey').length;
+
+    var bar = $('hintbar');
+    var all = $('diag');
+    if (!spec){
+      $('pmeta').innerHTML = '还没有载入题库。<br><em>点「打开题库」或把 .json 拖进窗口。</em>';
+      all.innerHTML = '<li class="w">还没有题库，先载入一份。</li>';
+      bar.hidden = true;
+      $('btnPrint').disabled = true;
+      document.title = '考前一卷 · 组卷器';
+      return;
+    }
+
+    var total = effectiveTotal(spec);
+    $('pmeta').innerHTML = '<b>' + esc(spec.meta.title || '未命名模拟卷') + '</b>'
+      + '<em>' + esc(spec.meta.course || '（未写课程）') + '</em><br>'
+      + spec.questions.length + ' 题 · ' + total + ' 分'
+      + (spec.meta.minutes > 0 ? ' · ' + spec.meta.minutes + ' 分钟' : '')
+      + '<br>' + spec.topics.length + ' 个考点';
+    document.title = showingHome ? '出卷首页 · 考前一卷' : (spec.meta.title || '模拟卷') + ' · 考前一卷';
+
+    var html = '';
+    errs.forEach(function(x){ html += '<li class="e">' + esc(x.msg) + '</li>'; });
+    warns.forEach(function(x){ html += '<li class="w">' + esc(x.msg) + '</li>'; });
+    if (!errs.length && !warns.length) html = '<li class="ok">卷面结构检查通过，可以打印。</li>';
+    all.innerHTML = html;
+
+    $('btnPrint').disabled = !!incomplete || errs.length > 0;
+    bar.hidden = !(errs.length || state.mode === 'teacher');
+    bar.textContent = errs.length
+      ? '有 ' + errs.length + ' 处必须改的问题（右侧红条），改好之前先别打印。'
+      : '教师版：试卷后面附答案、评分点、双向细目表和引文核对表；打印时答案会另起一页。';
+    if (!errs.length) bar.textContent = state.mode === 'teacher'
+      ? '教师版可勾选考点细目表和引文核对表。给学生发无答案的试卷，请导出学生版 PDF。'
+      : '学生版：只有题干和分值。要答案就切到教师版。';
+    save();
+  }
+
+  function load(raw){
+    var next = {spec:state.spec, batch:state.batch};
+    var parts = Array.isArray(raw) ? raw : [raw];
+    if (!parts.length) throw new Error('题库为空。');
+    parts.forEach(function(part){next = importPaper(next.spec,next.batch,part);});
+    state.spec = next.spec;
+    state.batch = next.batch;
+    state.checks = {};
+    $('revisionNumbers').value = '';
+    $('revisionStatus').textContent = '';
+    showingHome = false;
+    if (parts[0].part === undefined || parts[0].part === 1) state.mode = 'student';
+    toast(next.batch ? '已载入 ' + next.batch.part + '/' + next.batch.of + ' 批' : '已载入 ' + next.spec.questions.length + ' 题');
+    paint();
+    return true;
+  }
+
+  function loadText(text, silent){
+    try {
+      var data = parseLoose(text);
+      if (data && data.replacements) throw new Error('请在当前试卷展开“只换几道题”，填写题号后粘贴换题结果。');
+      return load(data);
+    } catch (e){
+      if (!silent) toast(e instanceof SyntaxError ? 'JSON 格式不完整，请检查是否截断。' : String(e.message || e), 5000);
+      return false;
+    }
+  }
+
+  $('btnHome').addEventListener('click',function(){ showingHome = true; paint(); window.scrollTo(0,0); });
+  $('btnResume').addEventListener('click',function(){ showingHome = false; paint(); window.scrollTo(0,0); });
+  document.querySelectorAll('[data-prompt]').forEach(function(button){
+    button.addEventListener('click',function(){
+      var level = $('difficulty').value;
+      var text = prompts[button.dataset.prompt]
+        .replace('本次整卷难度：标准模拟。','本次整卷难度：'+level+'。')
+        .replace('"difficulty": "标准模拟"','"difficulty": "'+level+'"');
+      copyText(text,level+'提示词已复制，请和教材一起发给 AI。');
+    });
+  });
+  function showDifficulty(){ $('difficultyHint').textContent = LEVELS[$('difficulty').value]; }
+  $('difficulty').addEventListener('change',showDifficulty);
+  showDifficulty();
+
+  function revisionTargets(){
+    if (!state.spec || $('revision').hidden) throw new Error('请先载入一份完整可用的试卷。');
+    return selectedQuestions(state.spec,$('revisionNumbers').value);
+  }
+  $('copyRevision').addEventListener('click',function(){
+    try {
+      var items = revisionTargets(), meta = state.spec.meta, level = $('revisionLevel').value;
+      var request = {title:meta.title,course:meta.course,replacements:items.map(function(item){
+        var q = item.q;
+        var changes = {ask:q.ask,answer:q.answer,rubric:q.rubric,trap:q.trap};
+        if (q.type==='选择题'){changes.options=q.options; changes.key=q.key;}
+        if (q.accept.length) changes.accept=q.accept;
+        return {id:q.id,before:q.ask,changes:changes};
+      })};
+      var context = items.map(function(item){
+        var q = item.q;
+        return {题号:item.num,题型:q.type,分值:q.points,考点:q.topics.map(id=>state.spec.topics.find(t=>t.id===id))};
+      });
+      var text = '仅将以下指定题换为“'+level+'”。'+LEVELS[level]+' 保留原卷章节、分值、题型、考点和其他题。请检查其他题引用的数据。为每道新题重写答案、评分点和易错处，选择题重写选项与答案字母。只返回最后这个 JSON 对象，只改 changes 内的值，其余字段原样保留。\n本次范围：'+JSON.stringify(context)+'\n'+JSON.stringify(request);
+      copyText(text,'换题要求已复制，请发回本卷的原对话。');
+    } catch(e){$('revisionStatus').textContent = e.message;}
+  });
+  $('btnOpen').addEventListener('click', function(){ $('file').click(); });
+  $('homeOpen').addEventListener('click', function(){ $('file').click(); });
+  $('homePaste').addEventListener('click', function(){ $('btnPaste').click(); });
+  ['onlyAnswers','withMatrix','withCites'].forEach(function(id){$(id).addEventListener('change',paint);});
+  $('checkSource').addEventListener('click',function(){ $('sourceFile').click(); });
+  $('sourceFile').addEventListener('change',async function(){
+    var file = this.files[0], spec = state.spec, source = $('sourceKey').value;
+    this.value = '';
+    if (!file || !spec) return;
+    try {
+      var results = checkText(spec,source,await file.text());
+      if (state.spec !== spec) return;
+      if (!Object.keys(results).length){toast('该材料采用页码定位，请在原 PDF 核对或使用随包脚本。');return;}
+      Object.assign(state.checks,results);
+      paint();
+      toast('已按所选原件核对 ' + Object.keys(results).length + ' 处。');
+    } catch(e){toast('原件未读入，请重新选择。');}
+  });
+  $('file').addEventListener('change', function(){
+    var f = this.files && this.files[0];
+    if (!f) return;
+    var fr = new FileReader();
+    fr.onload = function(){ loadText(String(fr.result), false); };
+    fr.readAsText(f, 'utf-8');
+    this.value = '';
+  });
+
+  var pendingRevision = null;
+  function openPaste(targets){
+    pendingRevision = targets ? {spec:state.spec,ids:targets.map(item=>item.q.id)} : null;
+    $('pasteTitle').textContent = targets ? '粘贴换题结果' : '粘贴题库 JSON';
+    $('pasteHelp').textContent = targets ? '只替换卷面第 '+targets.map(item=>item.num).join('、')+' 题。' : '粘贴完整题库。分批时从第 1 批开始，按顺序载入。';
+    $('ovPaste').classList.add('on');
+    $('ta').value = '';
+    $('ta').focus();
+  }
+  $('btnPaste').addEventListener('click',function(){openPaste(null);});
+  $('pasteRevision').addEventListener('click',function(){
+    try {openPaste(revisionTargets());} catch(e){$('revisionStatus').textContent=e.message;}
+  });
+  $('btnCancel').addEventListener('click', function(){ $('ovPaste').classList.remove('on'); });
+  $('btnOk').addEventListener('click', function(){
+    var v = $('ta').value;
+    if (!v.trim()) { toast('粘贴框是空的'); return; }
+    if (pendingRevision){
+      try {
+        if (pendingRevision.spec !== state.spec) throw new Error('当前卷子已切换，请重新选择题号。');
+        state.spec = applyRevision(state.spec,parseLoose(v),pendingRevision.ids);
+        $('revisionStatus').textContent = '已换第 '+$('revisionNumbers').value+' 题，其余题目和总分已保留。';
+        pendingRevision = null;
+        $('ovPaste').classList.remove('on');
+        paint();
+        toast($('revisionStatus').textContent);
+      } catch(e){toast(e.message,5000);}
+      return;
+    }
+    if (loadText(v, false)) $('ovPaste').classList.remove('on');
+  });
+
+  $('btnDemo').addEventListener('click', function(){
+    var node = $('demo');
+    if (!node) return;
+    load(JSON.parse(node.textContent));
+  });
+
+  $('btnPrint').addEventListener('click', function(){
+    if (!state.spec) return;
+    var errs = validate(state.spec).filter(function(x){ return x.level === 'error'; });
+    if (errs.length){ toast('先处理掉 ' + errs.length + ' 处红条再打印。'); return; }
+    toast(state.mode === 'teacher' ? '正在打印选中的教师版内容' : '打印学生版：只有题目', 1800);
+    setTimeout(function(){ window.print(); }, 320);
+  });
+
+  Array.prototype.forEach.call(document.querySelectorAll('.seg button'), function(b){
+    b.addEventListener('click', function(){
+      var m = b.getAttribute('data-mode');
+      state.mode = m;
+      paint();
+      window.scrollTo({top:0, behavior:'smooth'});
+    });
+  });
+
+  /* 拖拽导入 */
+  ['dragenter','dragover'].forEach(function(ev){
+    window.addEventListener(ev, function(e){
+      if (!e.dataTransfer) return;
+      e.preventDefault();
+      document.body.classList.add('drag');
+    });
+  });
+  ['dragleave','drop'].forEach(function(ev){
+    window.addEventListener(ev, function(e){
+      document.body.classList.remove('drag');
+      if (ev !== 'drop') return;
+      e.preventDefault();
+      var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!f){ return; }
+      var fr = new FileReader();
+      fr.onload = function(){ loadText(String(fr.result), false); };
+      fr.readAsText(f, 'utf-8');
+    });
+  });
+
+  /* 恢复上次 */
+  try {
+    var saved = localStorage.getItem(STORE);
+    if (!embeddedError && !window.__PAPER__ && saved) {
+      var previous = JSON.parse(saved);
+      state.spec = normaliseSpec(previous.spec);
+      state.batch = previous.batch || null;
+    } else if (!embeddedError && !window.__PAPER__ && localStorage.getItem('kaoqian.v1')) {
+      state.spec = normaliseSpec(JSON.parse(localStorage.getItem('kaoqian.v1')));
+    }
+  } catch(e){}
+
+  /* 被预装题库（DSH/embed.py 生成）时以预装的为准 */
+  if (window.__PAPER__) {
+    try { state.spec = normaliseSpec(window.__PAPER__); state.checks = window.__PAPER_CHECKS__ || {}; } catch(e){}
+  }
+
+  paint();
+  if (embeddedError){$('diag').innerHTML='<li class="e">'+esc(embeddedError)+'</li>';toast(embeddedError,6500);}
+})();
+</script>
+</body>
+</html>
